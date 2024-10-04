@@ -18,36 +18,37 @@ public class City {
     private boolean open;
     private Map<UUID, Rank> ranks = new HashMap<>();  // Ранги игроков
 
-
     // Конструктор города
     public City(String name, UUID mayor) {
         this.name = name;
         this.mayor = mayor;
         this.open = true;
-
+        addCitizen(mayor);
         ranks.put(mayor, Rank.MAYOR);  // Мэр получает ранг автоматически
     }
 
+    // Проверка, является ли игрок мэром
     public boolean isMayor(UUID playerUUID) {
         return mayor.equals(playerUUID);
     }
-
 
     // Добавление гражданина в город
     public void addCitizen(UUID playerUUID) {
         citizens.add(playerUUID);
         ranks.putIfAbsent(playerUUID, Rank.CITIZEN);  // По умолчанию гражданин
     }
+
     // Удаление гражданина из города
     public boolean removeCitizen(UUID playerUUID) {
+        if (isMayor(playerUUID)) {
+            return false;  // Мэра нельзя удалить как гражданина
+        }
         citizens.remove(playerUUID);
         ranks.remove(playerUUID);  // Удаляем ранг
         return true;
     }
-    // Добавление гражданина в город
 
-
-
+    // Получение граждан города
     public Set<UUID> getCitizens() {
         return citizens;
     }
@@ -57,30 +58,37 @@ public class City {
         claimedChunks.add(chunkPos);
     }
 
+    // Расприват территории (чанка)
     public void unclaimChunk(ChunkPos chunkPos) {
         claimedChunks.remove(chunkPos);
     }
 
+    // Проверка, приватен ли чанк
     public boolean isChunkClaimed(ChunkPos chunkPos) {
         return claimedChunks.contains(chunkPos);
     }
 
+    // Получение всех приватных чанков города
     public Set<ChunkPos> getClaimedChunks() {
         return claimedChunks;
     }
 
+    // Получение названия города
     public String getName() {
         return name;
     }
 
+    // Получение мэра города
     public UUID getMayor() {
         return mayor;
     }
 
+    // Проверка, открыт ли город для вступления
     public boolean isOpen() {
         return open;
     }
 
+    // Установка статуса города (открыт/закрыт)
     public void setOpen(boolean open) {
         this.open = open;
     }
@@ -94,13 +102,11 @@ public class City {
         ranks.remove(player);
     }
 
+    // Получение ранга игрока
     public Rank getRank(UUID player) {
-        if (isMayor(player)) { // Используем метод isMayor для проверки
+        if (isMayor(player)) {  // Если игрок мэр, возвращаем ранг мэра
             return Rank.MAYOR;
-        } else {
-            return Rank.CITIZEN;
         }
+        return ranks.getOrDefault(player, Rank.CITIZEN);  // Если нет другого ранга, по умолчанию гражданин
     }
-
-
 }
