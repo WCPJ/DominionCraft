@@ -20,7 +20,7 @@ import java.util.UUID;
 public class CityManager {
     private static Map<String, City> cities = new HashMap<>();  // Хранение всех городов (name -> city)
     private static Map<String, String> playerCityMap = new HashMap<>();  // Игрок -> Город (UUID игрока в String -> название города)
-    private static final File CITY_FOLDER = new File("data/cities");  // Папка для хранения данных городов
+
 
     // Получение города по его названию
     public static City getCity(String cityName) {
@@ -41,19 +41,21 @@ public class CityManager {
         String cityName = args[1];
 
         UUID playerUUID = player.getUniqueID();  // Получаем UUID игрока
+        Rank playerRank = CityManager.getRank(playerUUID, cityName);
 
         if (isPlayerInCity(playerUUID, cityName)) throw new CommandException("You are already part of a city.");
         if (isChunkClaimed(player.world, new ChunkPos(player.getPosition()))) throw new CommandException("Chunk is already claimed.");
 
-        City newCity = new City(cityName, playerUUID);
+        City newCity = new City(cityName, playerUUID); // Создаем город
         cities.put(cityName, newCity);
         playerCityMap.put(playerUUID.toString(), cityName);
         newCity.claimChunk(new ChunkPos(player.getPosition()));
 
-        saveCityToFile(newCity);
         player.sendMessage(new TextComponentString("City created successfully!"));
-    }
 
+        newCity.addRank(playerUUID, Rank.MAYOR);
+        System.out.println("CityManager: Player " + player.getName() + " has rank " + playerRank + " in city " + cityName);
+    }
     // Вступление в город
     public static void joinCity(EntityPlayer player, String[] args) throws CommandException {
         if (args.length < 2) throw new CommandException("Usage: /city join <name>");
@@ -69,7 +71,7 @@ public class CityManager {
         playerCityMap.put(playerUUID.toString(), cityName);
 
         player.sendMessage(new TextComponentString("Joined city " + cityName));
-        saveCityToFile(city);
+
     }
 
     // Приват чанка
@@ -85,7 +87,7 @@ public class CityManager {
             throw new CommandException("Chunk is already claimed.");
         }
 
-        saveCityToFile(city);
+
     }
 
     // Расприват чанка
@@ -106,7 +108,7 @@ public class CityManager {
             throw new CommandException("Chunk is not claimed.");
         }
 
-        saveCityToFile(city);
+
     }
 
     // Выход из города
@@ -126,7 +128,7 @@ public class CityManager {
         playerCityMap.remove(playerUUID.toString());
         player.sendMessage(new TextComponentString("You have left the city " + cityName));
 
-        saveCityToFile(city);
+
     }
 
     // Удаление города
@@ -146,11 +148,7 @@ public class CityManager {
             playerCityMap.remove(citizen.toString());
         }
 
-        // Удаляем файл города
-        File cityFile = new File(CITY_FOLDER, cityName + ".dat");
-        if (cityFile.exists()) {
-            cityFile.delete();
-        }
+
 
         player.sendMessage(new TextComponentString("City " + cityName + " has been deleted."));
     }
@@ -172,7 +170,7 @@ public class CityManager {
         city.addCitizen(inviteeUUID);  // Добавляем игрока в граждане города
         playerCityMap.put(inviteeUUID.toString(), cityName);
         player.sendMessage(new TextComponentString("Player " + inviteeName + " has been invited to join the city."));
-        saveCityToFile(city);
+
     }
 
     // Кик игрока
@@ -195,7 +193,7 @@ public class CityManager {
         playerCityMap.remove(playerToKickUUID.toString());
 
         player.sendMessage(new TextComponentString("Player " + playerToKickName + " was kicked from the city."));
-        saveCityToFile(city);
+
     }
 
     // Управление рангами (добавление и удаление)
@@ -240,7 +238,7 @@ public class CityManager {
             throw new CommandException("Invalid action. Use 'add' or 'remove'.");
         }
 
-        saveCityToFile(city);
+
     }
 
 
@@ -255,7 +253,7 @@ public class CityManager {
         if (!city.isMayor(playerUUID)) throw new CommandException("Only the mayor can close the city.");
         city.setOpen(false);  // Закрываем город для вступления
         player.sendMessage(new TextComponentString("City " + cityName + " is now closed for new players."));
-        saveCityToFile(city);
+
     }
 
     // Открытие города для вступления
@@ -268,7 +266,7 @@ public class CityManager {
         if (!city.isMayor(playerUUID)) throw new CommandException("Only the mayor can open the city.");
         city.setOpen(true);  // Открываем город для вступления
         player.sendMessage(new TextComponentString("City " + cityName + " is now open for new players."));
-        saveCityToFile(city);
+
     }
 
     // Показ информации о городе
@@ -318,41 +316,4 @@ public class CityManager {
         return false;
     }
 
-    // Сохранение данных города в файл
-    private static void saveCityToFile(City city) {
-        try {
-            if (!CITY_FOLDER.exists()) {
-                CITY_FOLDER.mkdirs();  // Создаем директорию, если она не существует
-            }
-            File cityFile = new File(CITY_FOLDER, city.getName() + ".dat");
-            NBTTagCompound cityData = city.toNBT();
-            CompressedStreamTools.write(cityData, cityFile);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    // Загрузка данных городов
-    public static void loadCities() {
-        if (!CITY_FOLDER.exists()) return;
-
-        File[] files = CITY_FOLDER.listFiles();
-        if (files != null) {
-            for (File file : files) {
-                if (file.isFile() && file.getName().endsWith(".dat")) {
-                    try {
-                        NBTTagCompound cityData = CompressedStreamTools.read(file);
-                        City city = City.fromNBT(cityData);
-                        cities.put(city.getName(), city);
-
-                        for (UUID citizen : city.getCitizens()) {
-                            playerCityMap.put(citizen.toString(), city.getName());
-                        }
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                }
-            }
-        }
-    }
 }
