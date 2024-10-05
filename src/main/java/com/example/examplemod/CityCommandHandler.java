@@ -86,6 +86,7 @@ public class CityCommandHandler extends CommandBase {
                 // Открытие города для вступления
                 CityManager.openJoin(player, server);
                 break;
+
             default:
                 throw new CommandException("Invalid subcommand.");
         }

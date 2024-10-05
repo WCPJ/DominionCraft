@@ -1,39 +1,44 @@
 package com.example.examplemod;
 
+import java.util.*;
+
 public enum Rank {
-    MAYOR("mayor"),  // Мэр
-    ADVISOR("advisor"),  // Советник
-    SOLDIER("soldier"),  // Солдат
-    CITIZEN("citizen"),  // Обычный гражданин
-    NONE("none");  // Не состоит в городе
+    MAYOR("mayor", true, true, true, new HashSet<>(Arrays.asList("new", "claim", "unclaim", "join", "leave", "info", "list", "delete", "invite", "kick", "rank", "closejoin", "openjoin"))),
+    ADVISOR("advisor", true, true, true, new HashSet<>(Arrays.asList("claim", "unclaim", "join", "leave", "info", "list", "invite", "rank", "closejoin", "openjoin"))),
+    CITIZEN("citizen", false, false, true, new HashSet<>(Arrays.asList("leave", "info", "list"))),
+    NONE("none", false, false, false, new HashSet<>(Arrays.asList("new", "join", "info", "list")));
 
     private final String rankName;
+    private final boolean canBuild;
+    private final boolean canBreak;
+    private final boolean canUse;
+    private final Set<String> permissions; // Права для каждого ранга
 
-    Rank(String rankName) {
+    Rank(String rankName, boolean canBuild, boolean canBreak, boolean canUse, Set<String> permissions) {
         this.rankName = rankName;
+        this.canBuild = canBuild;
+        this.canBreak = canBreak;
+        this.canUse = canUse;
+        this.permissions = permissions;
     }
 
     public String getRankName() {
         return rankName;
     }
 
-    // Определяем, может ли игрок использовать команду
-    public boolean canUseCommand(String command) {
-        switch (this) {
-            case MAYOR:
-                return true;  // Мэр может использовать все команды
-            case ADVISOR:
-                return !command.equals("delete") && !command.equals("kick");
-            case SOLDIER:
-                return command.equals("defend");
-            case CITIZEN:
-                return command.equals("join") || command.equals("leave") || command.equals("info") || command.equals("list");
-            case NONE:
-                return command.equals("join") || command.equals("info") || command.equals("list");
-            default:
-                return false;
-        }
+    public boolean canBuild() {
+        return canBuild;
+    }
+
+    public boolean canBreak() {
+        return canBreak;
+    }
+
+    public boolean canUse() {
+        return canUse;
+    }
+
+    public Set<String> getPermissions() {
+        return permissions; // Возвращает права для данного ранга
     }
 }
-
-

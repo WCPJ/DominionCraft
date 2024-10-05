@@ -8,6 +8,7 @@ import net.minecraft.util.text.TextComponentString;
 import net.minecraft.util.text.TextFormatting;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.World;
+import net.minecraftforge.fml.common.FMLCommonHandler;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -39,32 +40,47 @@ public class CityManager {
             city.addRank(playerUUID, Rank.MAYOR);
         }
     }
+    public static boolean isPlayerInCity(UUID playerUUID, String cityName) {
+        City city = cities.get(cityName.toLowerCase()); // Получаем город по имени
+        if (city == null) {
+            return false; // Город не существует
+        }
+        return city.getCitizens().contains(playerUUID); // Проверяем, является ли игрок гражданином
+    }
 
     // Создание города
     public static void createCity(EntityPlayer player, String[] args, MinecraftServer server) throws CommandException {
         if (args.length < 2) throw new CommandException("Usage: /city new <name>");
         String cityName = args[1];
-        if (cities.containsKey(cityName)) {
-            player.sendMessage(new TextComponentString(TextFormatting.RED + ("City with this name already have!")));
-            return ; // Создание города не удалось
+        if (cities.containsKey(cityName.toLowerCase())) {
+            player.sendMessage(new TextComponentString(TextFormatting.RED + "City with this name already exists!"));
+            return; // Создание города не удалось
         }
 
-
         UUID playerUUID = player.getUniqueID();
-        if (isPlayerInCity(playerUUID, cityName)) throw new CommandException("You are already part of a city.");
-        if (isChunkClaimed(player.world, new ChunkPos(player.getPosition()))) throw new CommandException("Chunk is already claimed.");
+        if (playerCityMap.containsKey(playerUUID.toString())) {
+            player.sendMessage(new TextComponentString(TextFormatting.RED + "You are already a member of a city!"));
+            return; // Игрок не может создать город, если он уже в одном
+        }
 
-        City newCity = new City(cityName, playerUUID);
-        cities.put(cityName, newCity);
+        // Проверка, приватен ли чанк
+        if (getCityByChunk(new ChunkPos(player.getPosition())) != null) {
+            throw new CommandException("Chunk is already claimed.");
+        }
+
+        City newCity = new City(cityName, playerUUID); // Создание нового города с мэром
+        cities.put(cityName.toLowerCase(), newCity); // Сохраняем город
         playerCityMap.put(playerUUID.toString(), cityName);
-        newCity.claimChunk(new ChunkPos(player.getPosition()));
-        newCity.addRank(playerUUID, Rank.MAYOR);
-        setMayor(playerUUID, cityName);
+        newCity.claimChunk(new ChunkPos(player.getPosition())); // Приватизация чанка
 
         player.sendMessage(new TextComponentString("Вы стали мэром города " + cityName + "!"));
         player.sendMessage(new TextComponentString("City created successfully!"));
-
     }
+
+
+
+
+
 
     // Вступление в город
     public static void joinCity(EntityPlayer player, String[] args) throws CommandException {
@@ -279,9 +295,7 @@ public class CityManager {
     }
 
     // Проверка, состоит ли игрок в городе
-     static boolean isPlayerInCity(UUID playerUUID, String cityName) {
-        return playerCityMap.containsKey(playerUUID.toString());
-    }
+
     public static Rank getRank(UUID playerUUID, String cityName) {
         for (City city : cities.values()) {
             Rank rank = city.getRank(playerUUID);
