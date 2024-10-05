@@ -16,6 +16,7 @@ public class City {
     private Set<UUID> citizens = new HashSet<>();
     private Set<ChunkPos> claimedChunks = new HashSet<>();
     private boolean open;
+    private Map<String, String> players;
     private Map<UUID, Rank> ranks = new HashMap<>();  // Ранги игроков
 
     // Конструктор города
@@ -27,9 +28,15 @@ public class City {
         ranks.put(mayor, Rank.MAYOR);  // Мэр получает ранг автоматически
     }
 
+
     // Проверка, является ли игрок мэром
     public boolean isMayor(UUID playerUUID) {
         return mayor.equals(playerUUID);
+    }
+    // Метод для добавления игрока и его роли
+    public void addPlayer(String playerName, String role) {
+        // Добавление игрока в словарь с его ролью
+        players.put(playerName, role);
     }
 
     // Добавление гражданина в город

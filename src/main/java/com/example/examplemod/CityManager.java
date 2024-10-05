@@ -44,6 +44,11 @@ public class CityManager {
     public static void createCity(EntityPlayer player, String[] args, MinecraftServer server) throws CommandException {
         if (args.length < 2) throw new CommandException("Usage: /city new <name>");
         String cityName = args[1];
+        if (cities.containsKey(cityName)) {
+            player.sendMessage(new TextComponentString(TextFormatting.RED + ("City with this name already have!")));
+            return ; // Создание города не удалось
+        }
+
 
         UUID playerUUID = player.getUniqueID();
         if (isPlayerInCity(playerUUID, cityName)) throw new CommandException("You are already part of a city.");
@@ -53,10 +58,12 @@ public class CityManager {
         cities.put(cityName, newCity);
         playerCityMap.put(playerUUID.toString(), cityName);
         newCity.claimChunk(new ChunkPos(player.getPosition()));
-
-        player.sendMessage(new TextComponentString("City created successfully!"));
         newCity.addRank(playerUUID, Rank.MAYOR);
         setMayor(playerUUID, cityName);
+
+        player.sendMessage(new TextComponentString("Вы стали мэром города " + cityName + "!"));
+        player.sendMessage(new TextComponentString("City created successfully!"));
+
     }
 
     // Вступление в город
