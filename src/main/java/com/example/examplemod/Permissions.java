@@ -22,15 +22,34 @@ public class Permissions {
     ));
 
     public static boolean canBuild(UUID playerUUID, String cityName, Map<String, City> cities, Map<String, String> playerCityMap) {
-        return hasRank(playerUUID, cityName, Rank.MAYOR, cities, playerCityMap) || hasRank(playerUUID, cityName, Rank.ADVISOR, cities, playerCityMap);
+        boolean hasMayorRank = hasRank(playerUUID, cityName, Rank.MAYOR, cities, playerCityMap);
+        boolean hasAdvisorRank = hasRank(playerUUID, cityName, Rank.ADVISOR, cities, playerCityMap);
+
+        System.out.println("Player UUID: " + playerUUID + " | City: " + cityName + " | Has Mayor Rank: " + hasMayorRank + " | Has Advisor Rank: " + hasAdvisorRank);
+
+        return hasMayorRank || hasAdvisorRank;
     }
 
     public static boolean canBreak(UUID playerUUID, String cityName, Map<String, City> cities, Map<String, String> playerCityMap) {
-        return hasRank(playerUUID, cityName, Rank.MAYOR, cities, playerCityMap) || hasRank(playerUUID, cityName, Rank.ADVISOR, cities, playerCityMap);
+        boolean hasMayorRank = hasRank(playerUUID, cityName, Rank.MAYOR, cities, playerCityMap);
+        boolean hasAdvisorRank = hasRank(playerUUID, cityName, Rank.ADVISOR, cities, playerCityMap);
+
+        // Вывод отладочной информации
+        System.out.println("Player UUID: " + playerUUID + " | City: " + cityName + " | Has Mayor Rank: " + hasMayorRank + " | Has Advisor Rank: " + hasAdvisorRank);
+
+        // Разрешаем разрушение, если у игрока есть ранг мэра или советника
+        return hasMayorRank || hasAdvisorRank;
     }
 
     public static boolean canUse(UUID playerUUID, String cityName, Map<String, City> cities, Map<String, String> playerCityMap) {
-        return hasRank(playerUUID, cityName, Rank.MAYOR, cities, playerCityMap) || hasRank(playerUUID, cityName, Rank.ADVISOR, cities, playerCityMap);
+        boolean hasMayorRank = hasRank(playerUUID, cityName, Rank.MAYOR, cities, playerCityMap);
+        boolean hasAdvisorRank = hasRank(playerUUID, cityName, Rank.ADVISOR, cities, playerCityMap);
+
+        // Вывод отладочной информации
+        System.out.println("Player UUID: " + playerUUID + " | City: " + cityName + " | Has Mayor Rank: " + hasMayorRank + " | Has Advisor Rank: " + hasAdvisorRank);
+
+        // Разрешаем использование, если у игрока есть ранг мэра или советника
+        return hasMayorRank || hasAdvisorRank;
     }
 
     public static Set<String> getPermissions(Rank rank) {
@@ -135,19 +154,11 @@ public class Permissions {
         return true; // В данном случае, разрешаем всем видеть список городов
     }
     // Проверки на право на действие
-    public static boolean canBuildInCity(UUID playerUUID, String cityName, Map<String, City> cities, Map<String, String> playerCityMap) {
-        Rank rank = getPlayerRank(playerUUID, cityName, playerCityMap);
-        return rank == Rank.MAYOR || rank == Rank.ADVISOR;
-    }
 
-    public static boolean canBreakInCity(UUID playerUUID, String cityName, Map<String, City> cities, Map<String, String> playerCityMap) {
-        Rank rank = getPlayerRank(playerUUID, cityName, playerCityMap);
-        return rank == Rank.MAYOR || rank == Rank.ADVISOR;
-    }
 
-    public static boolean canUseInCity(UUID playerUUID, String cityName, Map<String, City> cities, Map<String, String> playerCityMap) {
-        Rank rank = getPlayerRank(playerUUID, cityName, playerCityMap);
-        return rank == Rank.MAYOR || rank == Rank.ADVISOR;
+    // Проверка, состоит ли игрок в городе
+    private static boolean isPlayerInCity(UUID playerUUID, String cityName, Map<String, String> playerCityMap) {
+        return playerCityMap.get(playerUUID.toString()).equals(cityName); // Проверка, что город соответствует имени
     }
 
     private static Rank getPlayerRank(UUID playerUUID, String cityName, Map<String, String> playerCityMap) {

@@ -20,7 +20,7 @@ public class CityManager {
     public static Map<String, City> getCities() {
         return cities;
     }
-    private static Map<String, String> playerCityMap = new HashMap<>();  // Игрок -> Город (UUID игрока в String -> название города)
+    public static Map<String, String> playerCityMap = new HashMap<>();  // Игрок -> Город (UUID игрока в String -> название города)
     public static Map<String, String> getPlayerCityMap() {
         return playerCityMap;
     }
