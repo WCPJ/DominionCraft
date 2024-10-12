@@ -8,38 +8,46 @@ import net.minecraft.util.text.TextComponentString;
 import net.minecraft.util.text.TextFormatting;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.World;
-import net.minecraftforge.fml.common.FMLCommonHandler;
+
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 public class CityManager {
-    private static Map<String, City> cities = new HashMap<>();  // Хранение всех городов (name -> city)
+    public static Map<String, City> cities = new HashMap<>();  // Хранение всех городов (name -> city)
+    public static Map<String, City> getCities() {
+        return cities;
+    }
     private static Map<String, String> playerCityMap = new HashMap<>();  // Игрок -> Город (UUID игрока в String -> название города)
-
+    public static Map<String, String> getPlayerCityMap() {
+        return playerCityMap;
+    }
     // Получение города по его названию
     public static City getCity(String cityName) {
-        return cities.get(cityName);
+        City city = cities.get(cityName);
+        if (city == null) {
+            System.out.println("City " + cityName + " not found.");
+        }
+        return city;
     }
+
 
     // Проверка, является ли чанк частью города
-    public static String getCityByChunk(ChunkPos chunkPos) {
+    public static City getCityByChunk(ChunkPos chunkPos) {
         for (City city : cities.values()) {
             if (city.isChunkClaimed(chunkPos)) {
-                return city.getName();
+                return city; // Возвращаем объект City вместо имени
             }
         }
-        return null;
+        System.out.println("No city found for chunk at " + chunkPos);
+        return null; // Возвращаем null, если город не найден
     }
 
+
     // Установка мэра города
-    public static void setMayor(UUID playerUUID, String cityName) {
-        if (cities.containsKey(cityName)) {
-            City city = cities.get(cityName);
-            city.addRank(playerUUID, Rank.MAYOR);
-        }
-    }
+
     public static boolean isPlayerInCity(UUID playerUUID, String cityName) {
         City city = cities.get(cityName.toLowerCase()); // Получаем город по имени
         if (city == null) {
@@ -48,116 +56,204 @@ public class CityManager {
         return city.getCitizens().contains(playerUUID); // Проверяем, является ли игрок гражданином
     }
 
-    // Создание города
     public static void createCity(EntityPlayer player, String[] args, MinecraftServer server) throws CommandException {
-        if (args.length < 2) throw new CommandException("Usage: /city new <name>");
-        String cityName = args[1];
-        if (cities.containsKey(cityName.toLowerCase())) {
-            player.sendMessage(new TextComponentString(TextFormatting.RED + "City with this name already exists!"));
-            return; // Создание города не удалось
+        // Проверка наличия имени города в аргументах
+        if (args.length < 2) {
+            throw new CommandException("Usage: /city new <name>");
         }
 
-        UUID playerUUID = player.getUniqueID();
+        String cityName = args[1].toLowerCase(); // Приведение имени города к нижнему регистру
+        UUID playerUUID = player.getUniqueID(); // Получение UUID игрока
+
+        // Проверка, состоит ли игрок уже в городе
         if (playerCityMap.containsKey(playerUUID.toString())) {
-            player.sendMessage(new TextComponentString(TextFormatting.RED + "You are already a member of a city!"));
-            return; // Игрок не может создать город, если он уже в одном
+            throw new CommandException("You are already part of a city."); // Игрок не может создать город, если он уже в одном
         }
 
-        // Проверка, приватен ли чанк
+        // Проверка прав на создание города
+        if (!Permissions.canCreateCity(playerUUID, cityName, cities, playerCityMap)) {
+            throw new CommandException("You cannot create a city.");
+        }
+
+        // Проверка, занят ли чанк
         if (getCityByChunk(new ChunkPos(player.getPosition())) != null) {
             throw new CommandException("Chunk is already claimed.");
         }
 
-        City newCity = new City(cityName, playerUUID); // Создание нового города с мэром
-        cities.put(cityName.toLowerCase(), newCity); // Сохраняем город
-        playerCityMap.put(playerUUID.toString(), cityName);
+        // Создание нового города
+        City newCity = new City(cityName, playerUUID);
+        cities.put(cityName, newCity); // Сохраняем город в карте
+        playerCityMap.put(playerUUID.toString(), cityName); // Связываем игрока с городом
         newCity.claimChunk(new ChunkPos(player.getPosition())); // Приватизация чанка
 
-        player.sendMessage(new TextComponentString("Вы стали мэром города " + cityName + "!"));
+        // Назначение ранга мэра, с проверкой на существующего мэра
+        try {
+            newCity.addRank(playerUUID, Rank.MAYOR); // Назначение игрока мэром
+        } catch (IllegalStateException e) {
+            throw new CommandException(e.getMessage()); // Если уже есть мэр, выбрасываем исключение
+        }
+
+        // Уведомление игрока о создании города
+        player.sendMessage(new TextComponentString("You have become the mayor of city " + cityName + "!"));
         player.sendMessage(new TextComponentString("City created successfully!"));
     }
 
 
 
 
-
-
     // Вступление в город
     public static void joinCity(EntityPlayer player, String[] args) throws CommandException {
-        if (args.length < 2) throw new CommandException("Usage: /city join <name>");
-        String cityName = args[1];
+        // Проверка наличия имени города в аргументах
+        if (args.length < 2) {
+            throw new CommandException("Usage: /city join <name>");
+        }
 
-        UUID playerUUID = player.getUniqueID();
-        City city = cities.get(cityName);
-        if (city == null) throw new CommandException("City not found.");
-        if (isPlayerInCity(playerUUID, cityName)) throw new CommandException("You are already in a city.");
+        String cityName = args[1].toLowerCase(); // Приведение имени города к нижнему регистру
 
+        UUID playerUUID = player.getUniqueID(); // Получение UUID игрока
+        City city = cities.get(cityName); // Получаем город по имени
+
+        // Проверка, существует ли город и является ли игрок его гражданином
+        if (city == null) {
+            throw new CommandException("City not found.");
+        }
+        if (isPlayerInCity(playerUUID, cityName)) {
+            throw new CommandException("You are already in a city.");
+        }
+
+        // Проверка, может ли игрок присоединиться к городу
+        if (!Permissions.canJoinCity(playerUUID, playerCityMap)) {
+            throw new CommandException("You cannot join this city.");
+        }
+
+        // Добавление игрока в список граждан города
         city.addCitizen(playerUUID);
-        playerCityMap.put(playerUUID.toString(), cityName);
-        player.sendMessage(new TextComponentString("Joined city " + cityName));
+        playerCityMap.put(playerUUID.toString(), cityName); // Связываем игрока с городом
+        player.sendMessage(new TextComponentString("You have joined city " + cityName + "!")); // Уведомление игрока
     }
 
-    // Приват чанка
+
     public static void claimChunk(EntityPlayer player, ChunkPos chunkPos) throws CommandException {
+        // Получаем название города, к которому принадлежит игрок
         String cityName = playerCityMap.get(player.getUniqueID().toString());
-        if (cityName == null) throw new CommandException("You are not part of any city.");
-        City city = cities.get(cityName);
-        if (!city.isMayor(player.getUniqueID())) throw new CommandException("Only the mayor can claim chunks.");
-        if (!isChunkClaimed(player.world, chunkPos)) {
-            city.claimChunk(chunkPos);
-            player.sendMessage(new TextComponentString("Chunk claimed for city " + cityName));
-        } else {
+        System.out.println("Player UUID: " + player.getUniqueID() + ", City Name: " + cityName);
+
+        if (cityName == null) {
+            throw new CommandException("You are not part of any city.");
+        }
+
+        City city = cities.get(cityName); // Получаем объект города
+        UUID playerUUID = player.getUniqueID(); // Получаем UUID игрока
+
+        // Получаем ранги игрока
+        Set<Rank> playerRanks = city.getRanks(playerUUID);
+        System.out.println("Player " + player.getName() + " has ranks: " + playerRanks);
+
+        // Проверка прав на присвоение
+        if (!Permissions.canClaimChunk(playerUUID, cityName, cities, playerCityMap)) {
+            System.out.println("Player " + player.getName() + " does not have permission to claim chunks.");
+            throw new CommandException("You do not have permission to claim chunks.");
+        }
+
+        // Проверка, не является ли чанк уже заприваченным
+        if (isChunkClaimed(player.world, chunkPos)) {
             throw new CommandException("Chunk is already claimed.");
         }
+
+        city.claimChunk(chunkPos); // Приватизация чанка
+        player.sendMessage(new TextComponentString("Chunk claimed for city " + cityName + "!")); // Уведомление игрока
     }
+
+
+
 
     // Расприват чанка
     public static void unclaimChunk(EntityPlayer player, ChunkPos chunkPos) throws CommandException {
+        // Получаем название города, к которому принадлежит игрок
         String cityName = playerCityMap.get(player.getUniqueID().toString());
-        if (cityName == null) throw new CommandException("You are not part of any city.");
-        City city = cities.get(cityName);
-        if (!city.isMayor(player.getUniqueID())) throw new CommandException("Only the mayor can unclaim chunks.");
+        if (cityName == null) {
+            throw new CommandException("You are not part of any city.");
+        }
+
+        City city = cities.get(cityName); // Получаем объект города
+        UUID playerUUID = player.getUniqueID(); // Получаем UUID игрока
+
+        // Проверка прав на расприватизацию
+        if (!Permissions.canUnclaimChunk(playerUUID, cityName, cities, playerCityMap)) {
+            throw new CommandException("You do not have permission to unclaim chunks.");
+        }
+
+        // Проверка, является ли это единственным чанком города
         if (city.getClaimedChunks().size() <= 1) {
             throw new CommandException("You cannot unclaim the last chunk of the city.");
         }
-        if (city.isChunkClaimed(chunkPos)) {
-            city.unclaimChunk(chunkPos);
-            player.sendMessage(new TextComponentString("Chunk unclaimed."));
-        } else {
+
+        // Проверка, является ли чанк заприваченным
+        if (!city.isChunkClaimed(chunkPos)) {
             throw new CommandException("Chunk is not claimed.");
         }
+
+        city.unclaimChunk(chunkPos); // Расприватизация чанка
+        player.sendMessage(new TextComponentString("Chunk unclaimed.")); // Уведомление игрока
     }
+
+
 
     // Выход из города
     public static void leaveCity(EntityPlayer player, MinecraftServer server) throws CommandException {
         UUID playerUUID = player.getUniqueID();
         String cityName = playerCityMap.get(playerUUID.toString());
-        if (cityName == null) throw new CommandException("You are not part of any city.");
-        City city = cities.get(cityName);
-        if (city.isMayor(playerUUID)) {
-            throw new CommandException("You are the mayor of the city. You must delete the city to leave.");
+        if (cityName == null) {
+            throw new CommandException("You are not part of any city."); // Игрок не в городе
         }
+
+        City city = cities.get(cityName);
+
+        // Проверяем, является ли игрок мэром
+        if (city.isMayor(playerUUID)) {
+            throw new CommandException("You are the mayor of the city. You must delete the city to leave."); // Нельзя покинуть как мэр
+        }
+
+        // Удаляем игрока из города
         city.removeCitizen(playerUUID);
+
+        // Удаляем все ранги игрока в этом городе
+        city.removeAllRanks(playerUUID); // Предполагается, что у вас есть метод removeAllRanks
+
+        // Удаляем запись о городе игрока
         playerCityMap.remove(playerUUID.toString());
+
+        // Уведомление игрока
         player.sendMessage(new TextComponentString("You have left the city " + cityName));
     }
+
+
 
     // Удаление города
     public static void deleteCity(EntityPlayer player, MinecraftServer server) throws CommandException {
         UUID playerUUID = player.getUniqueID();
         String cityName = playerCityMap.get(playerUUID.toString());
-        if (cityName == null) throw new CommandException("You are not part of any city.");
-        City city = cities.get(cityName);
-        if (!city.isMayor(playerUUID)) throw new CommandException("Only the mayor can delete the city.");
 
-        cities.remove(cityName);
-        for (UUID citizen : city.getCitizens()) {
-            playerCityMap.remove(citizen.toString());
+        if (cityName == null) {
+            throw new CommandException("You are not part of any city."); // Игрок не в городе
         }
-        player.sendMessage(new TextComponentString("City " + cityName + " has been deleted."));
+
+        City city = cities.get(cityName);
+
+        // Проверка прав на удаление города
+        if (!Permissions.canDeleteCity(playerUUID, cityName, cities, playerCityMap)) {
+            throw new CommandException("Only the mayor can delete the city."); // Нельзя удалить город, если не мэр
+        }
+
+        cities.remove(cityName); // Удаляем город из списка городов
+        for (UUID citizen : city.getCitizens()) {
+            playerCityMap.remove(citizen.toString()); // Удаляем игроков из мапы
+        }
+        player.sendMessage(new TextComponentString("City " + cityName + " has been deleted.")); // Уведомление игрока
     }
 
-    // Приглашение игрока в город
+
+
     public static void invitePlayer(EntityPlayer player, String[] args, MinecraftServer server) throws CommandException {
         if (args.length < 2) throw new CommandException("Usage: /city invite <player>");
         String inviteeName = args[1];
@@ -171,78 +267,125 @@ public class CityManager {
         String cityName = playerCityMap.get(playerUUID.toString());
         if (cityName == null) throw new CommandException("You are not part of any city.");
         City city = cities.get(cityName);
-        if (!city.isMayor(playerUUID)) throw new CommandException("Only the mayor can invite players.");
+
+        // Проверка прав на приглашение игрока
+        if (!Permissions.canInvitePlayer(playerUUID, cityName, cities, playerCityMap)) {
+            throw new CommandException("Only the mayor can invite players.");
+        }
 
         city.addCitizen(inviteeUUID);
         playerCityMap.put(inviteeUUID.toString(), cityName);
         player.sendMessage(new TextComponentString("Player " + inviteeName + " has been invited to join the city."));
     }
 
-    // Кик игрока
+
     public static void kickPlayer(EntityPlayer player, String[] args, MinecraftServer server) throws CommandException {
-        if (args.length < 2) throw new CommandException("Usage: /city kick <player>");
-        String playerToKickName = args[1];
-
-        // Получаем UUID игрока по его имени
-        EntityPlayer targetPlayer = player.getServer().getPlayerList().getPlayerByUsername(playerToKickName);
-        if (targetPlayer == null) throw new CommandException("Player " + playerToKickName + " not found.");
-        UUID playerToKickUUID = targetPlayer.getUniqueID();
-
-        UUID playerUUID = player.getUniqueID();
-        String cityName = playerCityMap.get(playerUUID.toString());
-        City city = cities.get(cityName);
-        if (!city.isMayor(playerUUID)) throw new CommandException("Only the mayor can kick players.");
-        if (city.isMayor(playerToKickUUID)) {
-            throw new CommandException("You cannot kick yourself. Delete the city to leave.");
+        // Проверка, что введено достаточно аргументов
+        if (args.length < 2) {
+            throw new CommandException("Usage: /city kick <player>");
         }
 
-        city.removeCitizen(playerToKickUUID);
-        playerCityMap.remove(playerToKickUUID.toString());
-        player.sendMessage(new TextComponentString("Player " + playerToKickName + " was kicked from the city."));
+        String playerToKickName = args[1]; // Имя игрока, которого нужно кикнуть
+
+        // Получаем целевого игрока по имени
+        EntityPlayer targetPlayer = server.getPlayerList().getPlayerByUsername(playerToKickName);
+        if (targetPlayer == null) {
+            throw new CommandException("Player " + playerToKickName + " not found.");
+        }
+        UUID playerToKickUUID = targetPlayer.getUniqueID(); // UUID игрока, которого нужно кикнуть
+
+        UUID playerUUID = player.getUniqueID(); // UUID мэра
+        String cityName = playerCityMap.get(playerUUID.toString()); // Название города мэра
+        City city = cities.get(cityName); // Получаем объект города
+
+        // Проверка, является ли вызывающий игрок мэром города
+        if (!city.isMayor(playerUUID)) {
+            throw new CommandException("Only the mayor can kick players.");
+        }
+
+        // Проверяем, состоит ли игрок, которого кикают, в том же городе
+        String targetCityName = playerCityMap.get(playerToKickUUID.toString());
+        if (targetCityName == null || !targetCityName.equals(cityName)) {
+            throw new CommandException("Player " + playerToKickName + " is not part of your city.");
+        }
+
+        // Проверка, является ли игрок мэром
+        if (city.isMayor(playerToKickUUID)) {
+            throw new CommandException("You cannot kick the mayor. Delete the city to leave.");
+        }
+
+        // Удаляем гражданина
+        if (city.removeCitizen(playerToKickUUID)) {
+            playerCityMap.remove(playerToKickUUID.toString()); // Удаляем запись о городе игрока
+            player.sendMessage(new TextComponentString("Player " + playerToKickName + " was kicked from the city."));
+            targetPlayer.sendMessage(new TextComponentString("You have been kicked from the city " + cityName + "."));
+        } else {
+            throw new CommandException("Failed to kick player " + playerToKickName + " from the city.");
+        }
     }
+
+
+
 
     public static void manageRanks(EntityPlayer player, String[] args) throws CommandException {
         if (args.length < 4) throw new CommandException("Usage: /city rank <add|remove> <player> <rank>");
         String action = args[1];
         String targetPlayerName = args[2];
-        String rankName = args[3];
+        String rankName = args[3].toUpperCase();
 
         UUID playerUUID = player.getUniqueID();
         String cityName = playerCityMap.get(playerUUID.toString());
         if (cityName == null) throw new CommandException("You are not part of any city.");
         City city = cities.get(cityName);
 
-        if (!city.isMayor(playerUUID)) {
+        // Проверка прав на управление рангами
+        if (!Permissions.canManageRanks(playerUUID, cityName, cities, playerCityMap)) {
             throw new CommandException("Only the mayor can manage ranks.");
         }
 
-        // Попробуем получить UUID игрока через сервер
+        // Получаем целевого игрока
         EntityPlayer targetPlayer = player.getServer().getPlayerList().getPlayerByUsername(targetPlayerName);
         if (targetPlayer == null) {
             throw new CommandException("Player " + targetPlayerName + " not found.");
         }
         UUID targetPlayerUUID = targetPlayer.getUniqueID();
 
-        // Получаем город целевого игрока
+        // Проверяем, что целевой игрок в том же городе
         String targetCityName = playerCityMap.get(targetPlayerUUID.toString());
         if (targetCityName == null || !targetCityName.equals(cityName)) {
             throw new CommandException(targetPlayerName + " is not part of your city.");
         }
 
-        Rank rank = Rank.valueOf(rankName.toUpperCase());
+        // Проверка на существование ранга
+        Rank rank;
+        try {
+            rank = Rank.valueOf(rankName);
+        } catch (IllegalArgumentException e) {
+            throw new CommandException("Invalid rank name: " + rankName);
+        }
 
         if (action.equals("add")) {
-            city.addRank(targetPlayerUUID, rank);
-            player.sendMessage(new TextComponentString("Rank " + rankName + " assigned to " + targetPlayerName));
+            city.addRank(targetPlayerUUID, rank); // Добавляем ранг
+            System.out.println("Added rank: " + rank.getRankName() + " to player: " + targetPlayerName);
+            player.sendMessage(new TextComponentString("Rank " + rank.getRankName() + " assigned to " + targetPlayerName));
         } else if (action.equals("remove")) {
-            city.removeRank(targetPlayerUUID);
-            player.sendMessage(new TextComponentString("Rank removed from " + targetPlayerName));
+            // Удаляем указанный ранг
+            city.removeRank(targetPlayerUUID, rank); // Исправлено здесь
+            System.out.println("Removed rank: " + rank.getRankName() + " from player: " + targetPlayerName);
+            player.sendMessage(new TextComponentString("Rank " + rank.getRankName() + " removed from " + targetPlayerName));
         } else {
             throw new CommandException("Invalid action. Use 'add' or 'remove'.");
         }
 
-
+        // Проверяем текущие ранги у целевого игрока
+        Set<Rank> targetPlayerRanks = city.getRanks(targetPlayerUUID);
+        System.out.println("Current ranks for " + targetPlayerName + ": " + targetPlayerRanks);
     }
+
+
+
+
+
 
 
 
@@ -253,11 +396,15 @@ public class CityManager {
         if (cityName == null) throw new CommandException("You are not part of any city.");
         City city = cities.get(cityName);
 
-        if (!city.isMayor(playerUUID)) throw new CommandException("Only the mayor can close the city.");
+        // Проверка прав на закрытие города
+        if (!Permissions.canCloseJoin(playerUUID, cityName, cities, playerCityMap)) {
+            throw new CommandException("Only the mayor can close the city.");
+        }
+
         city.setOpen(false);  // Закрываем город для вступления
         player.sendMessage(new TextComponentString("City " + cityName + " is now closed for new players."));
-
     }
+
 
     // Открытие города для вступления
     public static void openJoin(EntityPlayer player, MinecraftServer server) throws CommandException {
@@ -266,11 +413,15 @@ public class CityManager {
         if (cityName == null) throw new CommandException("You are not part of any city.");
         City city = cities.get(cityName);
 
-        if (!city.isMayor(playerUUID)) throw new CommandException("Only the mayor can open the city.");
+        // Проверка прав на открытие города
+        if (!Permissions.canOpenJoin(playerUUID, cityName, cities, playerCityMap)) {
+            throw new CommandException("Only the mayor can open the city.");
+        }
+
         city.setOpen(true);  // Открываем город для вступления
         player.sendMessage(new TextComponentString("City " + cityName + " is now open for new players."));
-
     }
+
 
     // Показ информации о городе
     public static void cityInfo(ICommandSender sender, String[] args) throws CommandException {
@@ -279,14 +430,29 @@ public class CityManager {
         City city = cities.get(cityName);
         if (city == null) throw new CommandException("City not found.");
 
+        // Проверяем, имеет ли игрок право на получение информации о городе
+        UUID playerUUID = sender.getCommandSenderEntity() != null ? sender.getCommandSenderEntity().getUniqueID() : null;
+        if (playerUUID != null && !Permissions.canViewCityInfo(playerUUID, cityName, cities, playerCityMap)) {
+            throw new CommandException("You do not have permission to view city information.");
+        }
+
         sender.sendMessage(new TextComponentString(TextFormatting.GREEN + "City: " + city.getName()));
         sender.sendMessage(new TextComponentString("Mayor: " + city.getMayor()));
         sender.sendMessage(new TextComponentString("Citizens: " + city.getCitizens().size()));
         sender.sendMessage(new TextComponentString("Claimed Chunks: " + city.getClaimedChunks().size()));
     }
 
+
     // Показ списка городов
     public static void cityList(ICommandSender sender) {
+        UUID playerUUID = sender.getCommandSenderEntity() != null ? sender.getCommandSenderEntity().getUniqueID() : null;
+
+        // Проверяем, имеет ли игрок право на просмотр списка городов
+        if (playerUUID != null && !Permissions.canViewCityList(playerUUID)) {
+            sender.sendMessage(new TextComponentString("You do not have permission to view the city list."));
+            return;
+        }
+
         if (cities.isEmpty()) {
             sender.sendMessage(new TextComponentString("No cities exist."));
         } else {
@@ -294,27 +460,27 @@ public class CityManager {
         }
     }
 
+
     // Проверка, состоит ли игрок в городе
 
     public static Rank getRank(UUID playerUUID, String cityName) {
-        for (City city : cities.values()) {
-            Rank rank = city.getRank(playerUUID);
-            if (rank != null) {
-                return rank; // Возвращаем ранг, если игрок найден в городе
-            }
+        City city = cities.get(cityName.toLowerCase()); // Получаем город по имени
+        if (city != null) {
+            return city.getRank(playerUUID); // Возвращаем ранг игрока в этом городе
         }
-        return null; // Игрок не найден в ни одном городе
+        return null; // Если город не найден, возвращаем null
     }
+
 
 
     // Проверка, является ли чанк заприваченным
     private static boolean isChunkClaimed(World world, ChunkPos chunkPos) {
         for (City city : cities.values()) {
             if (city.isChunkClaimed(chunkPos)) {
-                return true;
+                return true; // Если чанк уже приватизирован, возвращаем true
             }
         }
-        return false;
+        return false; // Чанк не найден среди приватизированных
     }
 
 }
