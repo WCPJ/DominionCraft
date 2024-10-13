@@ -13,6 +13,10 @@ public class City {
     private Map<Rank, Set<String>> permissions; // Права для каждого ранга
     private Map<UUID, Set<Rank>> playerRanks; // Хранение рангов игроков
     private Map<UUID, Rank> ranks; // Ранги игроков в городе
+    private boolean allowPvP;
+    private boolean allowMobSpawning;
+    private boolean allowExplosions;
+
 
 
     // Конструктор города
@@ -26,6 +30,9 @@ public class City {
         this.ranks = new HashMap<>(); // Инициализация карты рангов
         playerRanks.put(mayor, new HashSet<>(Arrays.asList(Rank.MAYOR))); // Назначение мэра
         this.permissions = new HashMap<>(); // Инициализируем карту прав
+        this.allowPvP = false; // По умолчанию PvP разрешено
+        this.allowMobSpawning = false; // По умолчанию спавн мобов разрешен
+        this.allowExplosions = false; // По умолчанию взрывы разрешены
 
 
         addCitizen(mayor); // Добавляем мэра как гражданина
@@ -140,6 +147,32 @@ public class City {
         }
         return ranks.getOrDefault(playerUUID, Rank.CITIZEN); // Иначе возвращаем ранг игрока или CITIZEN по умолчанию
     }
+    // Метод для настройки разрешения PvP
+    public void setPvPAllowed(boolean allowed) {
+        this.allowPvP = allowed;
+    }
+
+    public boolean isPvPAllowed() {
+        return allowPvP;
+    }
+
+    // Метод для настройки разрешения спавна мобов
+    public void setMobSpawningAllowed(boolean allowed) {
+        this.allowMobSpawning = allowed;
+    }
+
+    public boolean isMobSpawningAllowed() {
+        return allowMobSpawning;
+    }
+
+    // Метод для настройки разрешения взрывов
+    public void setExplosionsAllowed(boolean allowed) {
+        this.allowExplosions = allowed;
+    }
+
+    public boolean areExplosionsAllowed() {
+        return allowExplosions;
+    }
 
 
 
@@ -159,6 +192,7 @@ public class City {
     public void setOpen(boolean open) {
         this.open = open; // Устанавливаем статус открытия
     }
+
 
 
 

@@ -44,6 +44,13 @@ public class CityManager {
         System.out.println("No city found for chunk at " + chunkPos);
         return null; // Возвращаем null, если город не найден
     }
+    // Метод для получения города игрока
+    public static String getPlayerCity(UUID playerUUID) {
+        return playerCityMap.get(playerUUID.toString());
+    }
+    public static City getCityByName(String cityName) {
+        return cities.get(cityName);
+    }
 
 
     // Установка мэра города
@@ -459,6 +466,8 @@ public class CityManager {
             sender.sendMessage(new TextComponentString("Cities: " + String.join(", ", cities.keySet())));
         }
     }
+    // Включить/выключить спавн мобов
+
 
 
     // Проверка, состоит ли игрок в городе
@@ -470,6 +479,7 @@ public class CityManager {
         }
         return null; // Если город не найден, возвращаем null
     }
+
 
 
 

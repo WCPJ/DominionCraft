@@ -1,10 +1,18 @@
 package com.example.examplemod;
 
+
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.text.TextComponentString;
+import net.minecraftforge.event.entity.EntityJoinWorldEvent;
+import net.minecraftforge.event.entity.player.AttackEntityEvent;
+import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.event.world.BlockEvent;
+import net.minecraftforge.event.world.ExplosionEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 
 public class CityEventHandler {
@@ -65,4 +73,58 @@ public class CityEventHandler {
             }
         }
     }
+    // Обработка события спавна сущностей (пример с использованием события, если оно есть)
+    @SubscribeEvent
+    public void onEntitySpawn(EntityJoinWorldEvent event) {
+        Entity entity = event.getEntity();
+        if (entity instanceof EntityLivingBase) { // Проверяем, является ли сущность мобом
+            ChunkPos chunkPos = new ChunkPos(entity.getPosition());
+
+            // Проверка, принадлежит ли чанк городу
+            City city = CityManager.getCityByChunk(chunkPos);
+            if (city != null && city.isChunkClaimed(chunkPos)) {
+                // Проверка, разрешен ли спавн мобв в этом городе
+                if (!city.isMobSpawningAllowed()) {
+                    event.setCanceled(true); // Блокируем спавн мобов
+                }
+            }
+        }
+
 }
+    // Обработка события взрыва
+    @SubscribeEvent
+    public void onExplosion(ExplosionEvent.Detonate event) {
+        BlockPos explosionPos = new BlockPos(event.getExplosion().getPosition()); // Преобразуем Vec3d в BlockPos
+        ChunkPos chunkPos = new ChunkPos(explosionPos); // Получаем ChunkPos из BlockPos
+
+        // Проверка, принадлежит ли чанк городу
+        City city = CityManager.getCityByChunk(chunkPos);
+        if (city != null && city.isChunkClaimed(chunkPos)) {
+            // Проверка, разрешены ли взрывы в этом городе
+            if (!city.areExplosionsAllowed()) { // Используем метод areExplosionsAllowed()
+                event.setCanceled(true); // Отмена события взрыва
+            }
+        }
+    }
+    // Обработка события атаки
+    @SubscribeEvent
+    public void onPlayerAttack(AttackEntityEvent event) {
+        EntityPlayer attacker = event.getEntityPlayer(); // Получаем атакующего
+        EntityLivingBase target = (EntityLivingBase) event.getTarget(); // Получаем цель атаки
+
+        // Проверка, что цель атаки - игрок
+        if (target instanceof EntityPlayer) {
+            ChunkPos chunkPos = new ChunkPos(target.getPosition()); // Получаем ChunkPos цели атаки
+            City city = CityManager.getCityByChunk(chunkPos); // Проверяем, принадлежит ли чанк городу
+
+            if (city != null && city.isChunkClaimed(chunkPos)) {
+                // Проверка, разрешено ли PvP в этом городе
+                if (!city.isPvPAllowed()) { // Проверяем разрешение на PvP
+                    event.setCanceled(true); // Отмена события атаки
+                    attacker.sendMessage(new TextComponentString("PvP is not allowed in this city!")); // Сообщение игроку
+                }
+            }
+        }
+    }
+}
+

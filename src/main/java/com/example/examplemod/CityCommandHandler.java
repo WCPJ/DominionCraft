@@ -7,6 +7,7 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.math.ChunkPos;
 
+
 public class CityCommandHandler extends CommandBase {
 
     @Override
@@ -16,7 +17,7 @@ public class CityCommandHandler extends CommandBase {
 
     @Override
     public String getUsage(ICommandSender sender) {
-        return "/city <new|claim|unclaim|join|leave|info|list|delete|invite|kick|rank|closejoin|openjoin>";
+        return "/city <new|claim|unclaim|join|leave|info|list|delete|invite|kick|rank|closejoin|openjoin|toggle>";
     }
 
     @Override
@@ -34,61 +35,61 @@ public class CityCommandHandler extends CommandBase {
 
         switch (args[0]) {
             case "new":
-                // Создание города
                 CityManager.createCity(player, args, server);
                 break;
             case "claim":
-                // Приват чанка
                 CityManager.claimChunk(player, playerChunk);
                 break;
             case "unclaim":
-                // Расприват чанка
                 CityManager.unclaimChunk(player, playerChunk);
                 break;
             case "join":
-                // Вступление в город
                 CityManager.joinCity(player, args);
                 break;
             case "leave":
-                // Выход из города
                 CityManager.leaveCity(player, server);
                 break;
             case "info":
-                // Информация о городе
                 CityManager.cityInfo(sender, args);
                 break;
             case "list":
-                // Список городов
                 CityManager.cityList(sender);
                 break;
             case "delete":
-                // Удаление города
                 CityManager.deleteCity(player, server);
                 break;
             case "invite":
-                // Приглашение игрока в город
                 CityManager.invitePlayer(player, args, server);
                 break;
             case "kick":
-                // Кик игрока из города
                 CityManager.kickPlayer(player, args, server);
                 break;
             case "rank":
-                // Управление рангами (добавление/удаление)
                 if (args.length < 4) throw new CommandException("Usage: /city rank <add|remove> <player> <rank>");
                 CityManager.manageRanks(player, args);
                 break;
             case "closejoin":
-                // Закрытие города для вступления
                 CityManager.closeJoin(player, server);
                 break;
             case "openjoin":
-                // Открытие города для вступления
                 CityManager.openJoin(player, server);
+                break;
+            case "toggle":
+                if (args.length < 3) throw new CommandException("Usage: /city toggle <mobspawn|explosions|pvp> <on|off>");
+                toggleCityFeature(player, args[1], args[2]);
                 break;
 
             default:
                 throw new CommandException("Invalid subcommand.");
         }
+    }
+
+    private void toggleCityFeature(EntityPlayer player, String feature, String state) throws CommandException {
+        String cityName = CityManager.getPlayerCity(player.getUniqueID());
+        if (cityName == null) {
+            throw new CommandException("You are not part of any city.");
+        }
+
+
     }
 }
