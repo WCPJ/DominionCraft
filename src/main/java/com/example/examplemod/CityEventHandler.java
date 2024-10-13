@@ -15,6 +15,9 @@ import net.minecraftforge.event.world.BlockEvent;
 import net.minecraftforge.event.world.ExplosionEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class CityEventHandler {
 
     // Обработка события разрушения блока
@@ -97,15 +100,40 @@ public class CityEventHandler {
         BlockPos explosionPos = new BlockPos(event.getExplosion().getPosition()); // Преобразуем Vec3d в BlockPos
         ChunkPos chunkPos = new ChunkPos(explosionPos); // Получаем ChunkPos из BlockPos
 
-        // Проверка, принадлежит ли чанк городу
+        // Проверка, принадлежит ли взрыв чанк города
         City city = CityManager.getCityByChunk(chunkPos);
-        if (city != null && city.isChunkClaimed(chunkPos)) {
-            // Проверка, разрешены ли взрывы в этом городе
-            if (!city.areExplosionsAllowed()) { // Используем метод areExplosionsAllowed()
-                event.setCanceled(true); // Отмена события взрыва
+        boolean inCity = (city != null && city.isChunkClaimed(chunkPos));
+
+        // Создаём временный список для хранения затронутых блоков, которые нужно удалить
+        List<BlockPos> blocksToRemove = new ArrayList<>();
+
+        // Проверка, затрагивает ли взрыв какие-либо блоки в зачищенных чанках
+        for (BlockPos pos : event.getAffectedBlocks()) {
+            ChunkPos affectedChunk = new ChunkPos(pos); // Получаем ChunkPos затронутого блока
+            City affectedCity = CityManager.getCityByChunk(affectedChunk); // Проверяем, принадлежит ли затронутый чанк городу
+
+            // Если взрыв происходит в городе
+            if (inCity) {
+                if (affectedCity != null && affectedCity.isChunkClaimed(affectedChunk)) {
+                    // Если взрыв затрагивает зачищенный чанк, добавляем затронутый блок в список для удаления
+                    if (!city.areExplosionsAllowed()) {
+                        blocksToRemove.add(pos); // Блок добавляется в список на удаление
+                    }
+                }
+            } else { // Если взрыв происходит за пределами города
+                if (affectedCity != null && affectedCity.isChunkClaimed(affectedChunk)) {
+                    // Если взрыв затрагивает зачищенный чанк, добавляем затронутый блок в список для удаления
+                    blocksToRemove.add(pos); // Блок добавляется в список на удаление
+                }
             }
         }
+
+        // Удаляем затронутые блоки после итерации
+        event.getAffectedBlocks().removeAll(blocksToRemove);
     }
+
+
+
     // Обработка события атаки
     @SubscribeEvent
     public void onPlayerAttack(AttackEntityEvent event) {

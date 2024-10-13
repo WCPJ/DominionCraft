@@ -144,6 +144,15 @@ public class Permissions {
     private static boolean isPlayerInCity(UUID playerUUID, String cityName, Map<String, String> playerCityMap) {
         return playerCityMap.get(playerUUID.toString()).equals(cityName); // Проверка, что город соответствует имени
     }
+    public static boolean CityToggle (UUID playerUUID, String cityName, Map<String, City> cities, Map<String, String> playerCityMap) {
+        City city = cities.get(cityName);
+        if (city == null) return false;
+
+        // Получаем ранги игрока в городе
+        Set<Rank> playerRanks = city.getPlayerRanks(playerUUID); // Предполагается, что в City есть метод getPlayerRanks
+        return playerRanks.contains(Rank.MAYOR) || playerRanks.contains(Rank.ADVISOR); // Проверка на наличие ранга
+    }
+
 
 
 
