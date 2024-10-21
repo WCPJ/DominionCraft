@@ -1,5 +1,7 @@
 package com.example.examplemod;
 
+import com.example.examplemod.Permissions.Permissions;
+import com.example.examplemod.Ranks.Rank;
 import net.minecraft.util.math.ChunkPos;
 
 import java.util.*;
